@@ -1,0 +1,395 @@
+openapi: 3.1.0
+info:
+  title: Vision Moderation as a Service (VMaaS) API
+  version: 1.0.0
+  description: |
+    Vision Moderation as a Service is a high-performance API for classifying images to detect prohibited content.
+    It supports synchronous single image predictions, high-throughput batch synchronous predictions, and asynchronous prediction jobs.
+servers:
+  - url: https://api.moderation.example.com
+    description: Production Environment
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /v1/predict:
+    post:
+      summary: Synchronous Single Prediction
+      description: |
+        Performs content classification on a single uploaded image and returns the prediction result synchronously.
+        Recommended for images where fast latency (p95 target 300ms) is required.
+      operationId: predictSync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictRequest'
+      responses:
+        '200':
+          description: Successful prediction
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            X-Model-Version:
+              $ref: '#/components/headers/X-Model-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '413':
+          $ref: '#/components/responses/413ContentTooLarge'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429TooManyRequests'
+        '503':
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /v1/predict-batch:
+    post:
+      summary: Synchronous Batch Prediction
+      description: |
+        Classify up to 32 images in a single synchronous call.
+        Each item in the request is processed, and results are returned keyed by the client-supplied identifiers.
+        Supports partial failures, returning individual error structures for corrupt or invalid items.
+      operationId: predictBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchPredictRequest'
+      responses:
+        '200':
+          description: Successful batch response. Note that individual items may have succeeded or failed.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            X-Model-Version:
+              $ref: '#/components/headers/X-Model-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchPredictResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '413':
+          $ref: '#/components/responses/413ContentTooLarge'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429TooManyRequests'
+        '503':
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /v1/predict-async:
+    post:
+      summary: Asynchronous Prediction Submission
+      description: |
+        Submit a single image for offline/asynchronous moderation processing.
+        Returns a job ID and a status URL immediately. Use this path for larger images or tasks where response times can exceed 300ms.
+      operationId: predictAsync
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictRequest'
+      responses:
+        '202':
+          description: Job accepted and queued.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncSubmitResponse'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '413':
+          $ref: '#/components/responses/413ContentTooLarge'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429TooManyRequests'
+        '503':
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+  /v1/predictions/{job_id}:
+    get:
+      summary: Get Asynchronous Prediction Result
+      description: Retrieves the status and prediction results of an asynchronous moderation job.
+      operationId: getAsyncPrediction
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: The unique identifier of the submitted async job.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: The current status or final output of the prediction job.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+            X-Model-Version:
+              $ref: '#/components/headers/X-Model-Version'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncResult'
+        '400':
+          $ref: '#/components/responses/400BadRequest'
+        '401':
+          $ref: '#/components/responses/401Unauthorized'
+        '404':
+          description: Job ID not found.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/X-Request-ID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/422Unprocessable'
+        '429':
+          $ref: '#/components/responses/429TooManyRequests'
+        '503':
+          $ref: '#/components/responses/503ServiceUnavailable'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Access key provided to tenants for VMaaS API access.
+
+  headers:
+    X-Request-ID:
+      description: Unique identifier for tracking and tracing requests.
+      schema:
+        type: string
+        format: uuid
+    X-Model-Version:
+      description: Version code of the active ML moderation model used to compute predictions.
+      schema:
+        type: string
+
+  responses:
+    400BadRequest:
+      description: Bad request. Missing mandatory fields or malformed payload.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    401Unauthorized:
+      description: Unauthorized. Missing or invalid X-API-Key header.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    413ContentTooLarge:
+      description: Content Too Large. The request payload size or image size exceeds limits (5 MB max per image).
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    422Unprocessable:
+      description: Unprocessable Content. Syntactically correct request, but contains invalid image encoding or parameters outside range.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    429TooManyRequests:
+      description: Too Many Requests. Tenant rate limits (200 RPS peak) exceeded.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    503ServiceUnavailable:
+      description: Service Unavailable. Downstream model servers are overloaded or offline.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/X-Request-ID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    PredictRequest:
+      type: object
+      required:
+        - image
+      properties:
+        image:
+          type: string
+          description: Base64-encoded image data. Must represent JPEG, PNG, or WebP up to 5 MB in size.
+          pattern: '^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$'
+        k:
+          type: integer
+          description: Maximum number of classification labels to return.
+          minimum: 1
+          maximum: 10
+          default: 5
+
+    PredictResponse:
+      type: object
+      required:
+        - predictions
+      properties:
+        predictions:
+          type: array
+          description: Detected content labels with calibrated probabilities, sorted by descending probability.
+          items:
+            $ref: '#/components/schemas/LabelPrediction'
+
+    LabelPrediction:
+      type: object
+      required:
+        - label
+        - probability
+      properties:
+        label:
+          type: string
+          description: Prohibited content category name (e.g. violence, adult_content, hate_speech, spam).
+        probability:
+          type: number
+          format: float
+          description: Calibrated confidence score between 0.0 and 1.0.
+          minimum: 0.0
+          maximum: 1.0
+
+    BatchPredictRequest:
+      type: object
+      description: A map of individual prediction requests keyed by a client-supplied identifier (max 32 items).
+      maxProperties: 32
+      additionalProperties:
+        $ref: '#/components/schemas/PredictRequest'
+
+    BatchPredictResponse:
+      type: object
+      description: A map of prediction results or errors, keyed by the client-supplied identifier corresponding to the request.
+      additionalProperties:
+        oneOf:
+          - $ref: '#/components/schemas/BatchItemSuccess'
+          - $ref: '#/components/schemas/BatchItemError'
+
+    BatchItemSuccess:
+      type: object
+      required:
+        - status
+        - predictions
+      properties:
+        status:
+          type: string
+          enum: [success]
+        predictions:
+          type: array
+          description: Predicted labels.
+          items:
+            $ref: '#/components/schemas/LabelPrediction'
+
+    BatchItemError:
+      type: object
+      required:
+        - status
+        - error
+      properties:
+        status:
+          type: string
+          enum: [failed]
+        error:
+          $ref: '#/components/schemas/Error'
+
+    AsyncSubmitResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - check_url
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Unique identifier for the async processing job.
+        status:
+          type: string
+          enum: [queued, running]
+          description: Initial state of the job.
+        check_url:
+          type: string
+          format: uri
+          description: Relative path or absolute URL to query the job outcome.
+
+    AsyncResult:
+      type: object
+      required:
+        - job_id
+        - status
+        - created_at
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        created_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        result:
+          $ref: '#/components/schemas/PredictResponse'
+        error:
+          $ref: '#/components/schemas/Error'
+
+    Error:
+      type: object
+      required:
+        - code
+        - message
+        - request_id
+      properties:
+        code:
+          type: string
+          description: Specific error code for application-level troubleshooting.
+        message:
+          type: string
+          description: Human-readable detail about the failure.
+        request_id:
+          type: string
+          format: uuid
+          description: The Request ID associated with the transaction for debugging purposes.

@@ -129,3 +129,17 @@ You will be reviewed on:
 - **Do your example payloads validate against your own schemas?**
 
 Design-first thinking. No frameworks, just contracts.
+
+---
+
+## Validation & Linting
+
+To run the validator and verify the OpenAPI 3.1.0 specification and all JSON examples against the contract, execute the following command:
+
+```bash
+python validate_spec.py
+```
+
+## Base64 Image Placeholder Note
+The base64-encoded image payloads used in `examples/predict-request.json` and `examples/batch-request.json` contain the string `iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==`. This string represents a valid 1x1 pixel transparent PNG image file. The size of this decoded binary image payload is approximately 70 bytes.
+

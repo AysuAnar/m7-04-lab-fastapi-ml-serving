@@ -1,0 +1,32 @@
+{
+  "image_001": {
+    "status": "success",
+    "predictions": [
+      {
+        "label": "spam",
+        "probability": 0.99
+      },
+      {
+        "label": "safe",
+        "probability": 0.01
+      }
+    ]
+  },
+  "image_002": {
+    "status": "failed",
+    "error": {
+      "code": "INVALID_IMAGE_ENCODING",
+      "message": "The base64 encoded string is corrupt or unsupported.",
+      "request_id": "7b5efb3c-2c5d-4f1e-9dda-6b3a2a1a8c9e"
+    }
+  },
+  "image_003": {
+    "status": "success",
+    "predictions": [
+      {
+        "label": "safe",
+        "probability": 0.995
+      }
+    ]
+  }
+}

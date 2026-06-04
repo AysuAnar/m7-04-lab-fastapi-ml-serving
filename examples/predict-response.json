@@ -1,0 +1,24 @@
+{
+  "predictions": [
+    {
+      "label": "hate_speech",
+      "probability": 0.875
+    },
+    {
+      "label": "violence",
+      "probability": 0.12
+    },
+    {
+      "label": "adult_content",
+      "probability": 0.003
+    },
+    {
+      "label": "spam",
+      "probability": 0.001
+    },
+    {
+      "label": "safe",
+      "probability": 0.001
+    }
+  ]
+}
